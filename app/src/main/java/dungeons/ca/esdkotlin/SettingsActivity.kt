@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ca.dungeons.sensordump;
+package dungeons.ca.esdkotlin
 
 import android.content.SharedPreferences;
 import android.os.Bundle;

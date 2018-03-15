@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ca.dungeons.sensordump;
+package dungeons.ca.esdkotlin
 
 import android.app.Service;
 import android.content.Intent;
@@ -30,7 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class EsdServiceManager extends Service {
+class ServiceManager extends Service {
   /** Identify logcat messages. */
   private static final String logTag = "EsdServiceManager";
   /** Creates a new binder to this service. */
