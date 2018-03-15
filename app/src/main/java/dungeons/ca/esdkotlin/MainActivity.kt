@@ -26,8 +26,7 @@ import org.w3c.dom.Text
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
-import dungeons.ca.esdkotlin.EsdServiceManager
-
+import dungeons.ca.esdkotlin.ServiceManager
 
 /**
  * Created by Gurtok on 3/11/2018.
@@ -35,52 +34,53 @@ import dungeons.ca.esdkotlin.EsdServiceManager
 /** Identify logcat messages. */
 val logTag = "MainActivity"
 /** Do NOT record more than once every 50 milliseconds. Default value is 250ms. */
-val MIN_SENSOR_REFRESH = 50;
-/** Persistent access to the apps database to avoid creating multiple db objects. */
-val databaseHelper: DatabaseHelper = DatabaseHelper()
-/** The backend service that runs data collection and uploading. */
-var serviceManager: EsdServiceManager = ServiceManager ;
-/** If the UI thread is active, it should be bound to the service manager. */
-var boolean isBound = false;
-/** Refresh time in milliseconds. Default = 250ms. */
-var int sensorRefreshTime = 250;
-/** This scheduled thread will run the UI screen updates. */
-val ScheduledExecutorService updateTimer = Executors.newSingleThreadScheduledExecutor();
-/** Number of sensor readings this session */
-var sensorReadings, documentsIndexed, gpsReadings, uploadErrors, audioReadings = 0;
-
-
-/** The current database population. Probably does not need to be a long, research how sql deals with IDs. */
-var databasePopulation: TextView = 0L
-var sensorTV: TextView
-var documentsTV: TextView
-var gpsTV: TextView
-var errorsTV: TextView
-var audioTV: TextView
-var databaseTV: TextView = null
-
-
-
+val MIN_SENSOR_REFRESH = 50
 
 // Stubbing out the port for now.
-
 class MainActivity : Activity(){
 
-  var updateRunnable: Runnable = Runnable {
+  /** Persistent access to the apps database to avoid creating multiple db objects. */
+  var databaseHelper: DatabaseHelper = DatabaseHelper()
+  /** The backend service that runs data collection and uploading. */
+  var serviceManager: ServiceManager = ServiceManager
+  /** If the UI thread is active, it should be bound to the service manager. */
+  var isBound = false
+  /** Refresh time in milliseconds. Default = 250ms. */
+  var sensorRefreshTime: Int = 250
+
+  /** This scheduled thread will run the UI screen updates. */
+  var updateTimer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+  /** The current database population. Probably does not need to be a long, research how sql deals with IDs. */
+  val databasePopulation: TextView? = null
+  var sensorTV: TextView = TextView(null)
+  var documentsTV: TextView = TextView(null)
+  var gpsTV: TextView = TextView(null)
+  var errorsTV: TextView = TextView(null)
+  var audioTV: TextView = TextView(null)
+  var databaseTV: TextView = TextView(null)
+  /** Number of sensor readings this session */
+  var sensorReadings: Int = 0
+  var documentsIndexed: Int = 0
+  var gpsReadings: Int = 0
+  var uploadErrors: Int = 0
+  var audioReadings: Int = 0
+
+
+  private var updateRunnable: Runnable = Runnable {
     run{
       runOnUiThread( { updateScreen() } )
     }
   }
 
-  private val serviceManagerConnection =  object: ServiceConnection {
+  private var serviceManagerConnection =  object: ServiceConnection {
     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
       val serviceBinder  = service as ServiceBinder
-      serviceManager = serviceBinder.getService();
-      isBound = true;
+      serviceManager = serviceBinder.getService()
+      isBound = true
     }
 
     override fun onServiceDisconnected(p0: ComponentName?) {
-      TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+      isBound = false
     }
   }
 
