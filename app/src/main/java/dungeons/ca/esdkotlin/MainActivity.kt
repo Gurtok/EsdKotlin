@@ -26,23 +26,21 @@ import org.w3c.dom.Text
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
-import dungeons.ca.esdkotlin.ServiceManager
+import dungeons.ca.esdkotlin.ServiceManager.ServiceBinder
 
-/**
- * Created by Gurtok on 3/11/2018.
- */
-/** Identify logcat messages. */
-val logTag = "MainActivity"
-/** Do NOT record more than once every 50 milliseconds. Default value is 250ms. */
-val MIN_SENSOR_REFRESH = 50
+/** Created by Gurtok on 3/11/2018 */
 
 // Stubbing out the port for now.
 class MainActivity : Activity(){
 
+  /** Identify logcat messages. */
+  private val logTag = "MainActivity"
+  /** Do NOT record more than once every 50 milliseconds. Default value is 250ms. */
+  private val MIN_SENSOR_REFRESH = 50
   /** Persistent access to the apps database to avoid creating multiple db objects. */
   var databaseHelper: DatabaseHelper = DatabaseHelper()
   /** The backend service that runs data collection and uploading. */
-  var serviceManager: ServiceManager = ServiceManager
+  var serviceManager: ServiceManager = ServiceManager()
   /** If the UI thread is active, it should be bound to the service manager. */
   var isBound = false
   /** Refresh time in milliseconds. Default = 250ms. */

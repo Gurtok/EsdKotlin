@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <EditTextPreference
+        android:key="host"
+        android:summary="Host or IP for elastic search server."
+        android:title="ES Host" />
+    <EditTextPreference
+        android:defaultValue="9200"
+        android:key="port"
+        android:summary="Port for ES index. Usually 9200"
+        android:title="ES Port" />
+    <EditTextPreference
+        android:key="index"
+        android:summary="Index name for sensor dump. Default is fine."
+        android:title="ES Index" />
+    <CheckBoxPreference
+        android:key="index_date"
+        android:summary="Add current date to index name."
+        android:title="Date Stamp Index" />
+    <EditTextPreference
+        android:key="tag"
+        android:summary="Tag sensor data with this string (optional)."
+        android:title="ES Tag" />
+    <EditTextPreference
+        android:key="user"
+        android:summary="@string/EsUsernamePreferences"
+        android:title="ES Username" />
+    <EditTextPreference
+        android:key="pass"
+        android:summary="@string/EsPasswordPreferences"
+        android:title="ES Password" />
+    <CheckBoxPreference
+        android:key="ssl"
+        android:summary="@string/Es_ssl_protection"
+        android:title="Use SSL" />
+    <Preference
+        android:key="qr_code"
+        android:summary="@string/qrCodeSummary"
+        android:title="@string/qrCodeTitle"
+        />
+
+</PreferenceScreen>
