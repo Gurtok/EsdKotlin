@@ -101,13 +101,7 @@ class MainActivity : Activity(){
     startService( startIntent )
     bindService( startIntent, serviceManagerConnection, Context.BIND_AUTO_CREATE )
   }
-
-
-
-
-
-
-
+  
   /** Call service manager to receive a bundle of updated data counts. */
   fun getScreenUpdates(){
 

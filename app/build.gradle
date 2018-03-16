@@ -5,9 +5,9 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 25
+    compileSdkVersion 26
     defaultConfig {
-        applicationId "ca.dungeons.sensordump.kotlin"
+        applicationId "dungeons.ca.esdkotlin"
         minSdkVersion 25
         targetSdkVersion 25
         versionCode 1
