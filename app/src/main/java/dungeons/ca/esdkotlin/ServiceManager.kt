@@ -30,95 +30,86 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-class ServiceManager extends Service {
+class ServiceManager: Service() {
   /** Identify logcat messages. */
-  private static final String logTag = "EsdServiceManager";
+  private val logTag = "EsdServiceManager"
   /** Creates a new binder to this service. */
-  private final IBinder serviceManagerBinder = new ServiceBinder();
+  private var serviceManagerBinder = ServiceBinder()
   /** New instance of the sensor thread. */
-  private SensorListener sensorListener;
+  private var sensorListener: SensorListener()
   /** This thread pool is the working pool. Use this to execute the sensor runnable and Uploads. */
-  private final ExecutorService workingThreadPool = Executors.newFixedThreadPool(2);
+  private var workingThreadPool = Executors.newFixedThreadPool(2)
   /**
    * This thread pool handles the timer in which we control this service.
    * Timer that controls if/when we should be uploading data to the server.
    */
-  private final ScheduledExecutorService timerPool = Executors.newScheduledThreadPool(2);
+  private val timerPool = Executors.newScheduledThreadPool(2)
   /** Number of sensor readings this session. */
-  private int sensorReadings = 0;
+  private var sensorReadings = 0
   /** Number of audio readings this session. */
-  private int audioReadings = 0;
+  private var audioReadings = 0
   /** Number of gps locations recorded this session */
-  private int gpsReadings = 0;
+  private var gpsReadings = 0
   /** Number of documents indexed to Elastic this session. */
-  private int documentsIndexed = 0;
+  private var documentsIndexed = 0
   /** Number of data uploaded failures this session. */
-  private int uploadErrors = 0;
+  private var uploadErrors = 0
   /** True if we are currently reading sensor data. */
-  private boolean logging = false;
+  private var logging = false
   /** Toggle, if we should be recording AUDIO sensor data. */
-  private boolean audioLogging = false;
+  private var audioLogging = false
   /** Toggle, if we should be recording GPS data. */
-  private boolean gpsLogging = false;
+  private var gpsLogging = false
   /** Uploads controls the data flow between the local database and Elastic server. */
-  private Uploads uploads;
+  private var uploads = UploadThread()
   /** This is the runnable we will use to check network connectivity once every 30 min. */
-  private final Runnable uploadRunnable = new Runnable() {
-    @Override
-    public void run() {
-      if (!uploads.isWorking()) {
-        workingThreadPool.submit(uploads);
-      } else if (uploads.isWorking()) {
-        Log.e(logTag, "Uploading already in progress.");
-      } else {
-        Log.e(logTag, "Failed to submit uploads runnable to thread pool!");
-      }
+  private val uploadRunnable = Runnable {
+    if (!uploads.isWorking()) {
+      workingThreadPool.submit(uploads)
+    } else if (uploads.isWorking()) {
+      Log.e(logTag, "Uploading already in progress.")
+    } else {
+      Log.e(logTag, "Failed to submit uploads runnable to thread pool!")
     }
-  };
+  }
 
   /** Applications' single instance of DatabaseHelper. Pass this to underlying functions. */
-  private DatabaseHelper dbHelper;
+  private var dbHelper: DatabaseHelper = DatabaseHelper()
   /** Toggle, if this service is currently running. Used by the main activity. */
-  private boolean serviceActive = false;
+  private var serviceActive = false;
   /** Time of the last sensor recording. Used to shut down unused resources. */
-  private long lastSuccessfulSensorTime;
+  private var lastSuccessfulSensorTime = 0L
   /** If we go more than an a half hour without recording any sensor data, shut down this thread. */
-  private final Runnable serviceTimeoutRunnable = new Runnable() {
-    @Override
-    public void run() {
-      // Last sensor result plus 1/2 hour in milliseconds is greater than the current time.
-      boolean timeCheck = lastSuccessfulSensorTime + (1000 * 60 * 30) > System.currentTimeMillis();
-      if (!logging && !uploads.isWorking() && !timeCheck) {
-        Log.e(logTag, "Shutting down service. Not logging!");
-        stopServiceThread();
-      }
+  private val serviceTimeoutRunnable = Runnable {
+    // Last sensor result plus 1/2 hour in milliseconds is greater than the current time.
+    val timeCheck = lastSuccessfulSensorTime + (1000 * 60 * 30) > System.currentTimeMillis()
+    if (!logging && !uploads.isWorking() && !timeCheck) {
+      Log.e(logTag, "Shutting down service. Not logging!")
+      stopServiceThread()
     }
-  };
+  }
 
   /**
    * Default constructor:
    * Instantiate the class broadcast receiver and messageFilters.
    * Register receiver to make sure we can communicate with the other threads.
    */
-  @Override
-  public void onCreate() {
-    SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
-    dbHelper = new DatabaseHelper(this);
-    sensorListener = new SensorListener(getBaseContext(), dbHelper, this);
-    uploads = new Uploads(sharedPrefs, this, dbHelper);
+  init {
+    val sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
+    dbHelper = object: DatabaseHelper(this)
+    sensorListener = object: SensorListener(baseContext, dbHelper, this)
+    uploads = Uploads(sharedPrefs, this, dbHelper)
   }
 
   /** Return a reference to this instance of the service. */
-  @Nullable
-  @Override
-  public IBinder onBind(Intent intent) {
-    return serviceManagerBinder;
+  override fun onBind( intent: Intent): IBinder {
+    return serviceManagerBinder
   }
 
   /** Stop the service manager as a whole. */
-  void stopServiceThread() {
-    stopLogging();
-    stopSelf();
+  fun stopServiceThread() {
+    stopLogging()
+    stopSelf()
   }
 
   /**
@@ -128,36 +119,35 @@ class ServiceManager extends Service {
    * @param startId - Name of mainActivity.
    * @return START_STICKY will make sure the OS restarts this process if it has to trim memory.
    */
-  @Override
-  public int onStartCommand(Intent intent, int flags, int startId) {
-    //Log.e(logTag, "ESD -- On Start Command." );
+  override fun onStartCommand( intent: Intent, flags: Int, startId: Int ): Int {
+    //Log.e(logTag, "ESD -- On Start Command." )
     if (!serviceActive) {
-      lastSuccessfulSensorTime = System.currentTimeMillis();
+      lastSuccessfulSensorTime = System.currentTimeMillis()
       /* Use SensorRunnable class to start the logging process. */
-      workingThreadPool.submit(sensorListener);
+      workingThreadPool.submit(sensorListener)
       /* Create an instance of Uploads, and submit to the thread pool to begin execution. */
       /* Schedule periodic checks for internet connectivity. */
-      timerPool.scheduleAtFixedRate(uploadRunnable, 5, 60, TimeUnit.SECONDS);
+      timerPool.scheduleAtFixedRate(uploadRunnable, 5, 60, TimeUnit.SECONDS)
       /* Schedule periodic checks for service shutdown due to inactivity. */
-      timerPool.scheduleAtFixedRate(serviceTimeoutRunnable, 60, 60, TimeUnit.MINUTES);
+      timerPool.scheduleAtFixedRate(serviceTimeoutRunnable, 60, 60, TimeUnit.MINUTES)
       /* Send a message to the main thread to indicate the manager service has been initialized. */
-      serviceActive = true;
-      Log.i(logTag, "Started service manager.");
+      serviceActive = true
+      Log.i(logTag, "Started service manager.")
     }
     // If the service is shut down, do not restart it automatically.
-    return Service.START_NOT_STICKY;
+    return Service.START_NOT_STICKY
   }
 
   /** This method uses the passed UI handler to relay messages if/when the activity is running. */
-  Bundle updateUiData() {
-    Bundle outBundle = new Bundle();
-    outBundle.putInt("sensorReadings", sensorReadings);
-    outBundle.putInt("gpsReadings", gpsReadings);
-    outBundle.putInt("audioReadings", audioReadings);
-    outBundle.putInt("documentsIndexed", documentsIndexed);
-    outBundle.putInt("uploadErrors", uploadErrors);
-    outBundle.putLong("databasePopulation", dbHelper.databaseEntries());
-    return outBundle;
+  fun updateUiData(): Bundle {
+    val outBundle = Bundle()
+    outBundle.putInt("sensorReadings", sensorReadings)
+    outBundle.putInt("gpsReadings", gpsReadings)
+    outBundle.putInt("audioReadings", audioReadings)
+    outBundle.putInt("documentsIndexed", documentsIndexed)
+    outBundle.putInt("uploadErrors", uploadErrors)
+    outBundle.putLong("databasePopulation", dbHelper.databaseEntries())
+    return outBundle
   }
 
   /**
@@ -166,12 +156,12 @@ class ServiceManager extends Service {
    * @param gpsReading   - Boolean GPS sensor data.
    * @param audioReading - Boolean AUDIO sensor data.
    */
-  public void sensorSuccess(boolean gpsReading, boolean audioReading) {
-    sensorReadings++;
+  fun sensorSuccess( gpsReading: Boolean, audioReading: Boolean) {
+    sensorReadings++
     if (gpsReading)
-      gpsReadings++;
+      gpsReadings++
     if (audioReading)
-      audioReadings++;
+      audioReadings++
   }
 
   /**
@@ -179,37 +169,37 @@ class ServiceManager extends Service {
    * @param result - Boolean true if successful.
    * @param count  - Integer, how many records were indexed.
    */
-  public void uploadSuccess(boolean result, int count) {
+  fun uploadSuccess( result: Boolean, count: Int) {
     if (result)
-      documentsIndexed += count;
+      documentsIndexed += count
     else
-      uploadErrors++;
+      uploadErrors++
   }
 
   /**
    * Control method to enable/disable gps recording.
    * @param power - Boolean true if we need to record sensor data.
    */
-  void setGpsPower(boolean power) {
-    gpsLogging = power;
-    sensorListener.setGpsPower(power);
+  fun setGpsPower( power: Boolean ) {
+    gpsLogging = power
+    sensorListener.setGpsPower(power)
   }
 
   /**
    * Control method to change the sensor refresh rate.
    * @param updatedRefresh - Integer in milliseconds. 99 < updatedRefresh < 1000
    */
-  void setSensorRefreshTime(int updatedRefresh) {
-    sensorListener.setSensorRefreshTime(updatedRefresh);
+  fun setSensorRefreshTime( updatedRefresh: Int) {
+    sensorListener.setSensorRefreshTime(updatedRefresh)
   }
 
   /**
    * Control method to enable/disable audio recording.
    * @param power - Boolean true if we need to record sensor data.
    */
-  void setAudioPower(boolean power) {
-    audioLogging = power;
-    sensorListener.setAudioPower(power);
+  fun setAudioPower( power: Boolean ) {
+    audioLogging = power
+    sensorListener.setAudioPower(power)
   }
 
   /**
@@ -219,17 +209,17 @@ class ServiceManager extends Service {
    * 2. GPS toggle.
    * 3. AUDIO toggle.
    */
-  public void startLogging() {
-    logging = true;
-    sensorListener.setSensorPower(true);
-    sensorListener.setGpsPower(gpsLogging);
-    sensorListener.setAudioPower(audioLogging);
+  fun startLogging() {
+    logging = true
+    sensorListener.setSensorPower(true)
+    sensorListener.setGpsPower(gpsLogging)
+    sensorListener.setAudioPower(audioLogging)
   }
 
   /** Stop the sensor listener. */
-  public void stopLogging() {
-    logging = false;
-    sensorListener.setSensorPower(false);
+  fun stopLogging() {
+    logging = false
+    sensorListener.setSensorPower(false)
   }
 
   /**
@@ -237,17 +227,16 @@ class ServiceManager extends Service {
    * 1. Stop sensor thread.
    * 2. Stop upload thread.
    */
-  @Override
-  public void onDestroy() {
-    sensorListener.stopThread();
-    uploads.stopUploading();
-    super.onDestroy();
+  override fun onDestroy() {
+    sensorListener.stopThread()
+    uploads.stopUploading()
+    super.onDestroy()
   }
 
   /** A class to supply a binder to the UI thread. */
-  class ServiceBinder extends Binder {
-    EsdServiceManager getService() {
-      return EsdServiceManager.this;
+  class ServiceBinder: Binder() {
+    fun getService(): Binder {
+      return this
     }
   }
 
