@@ -22,11 +22,10 @@ import android.util.Log
 import org.json.JSONException
 
 import org.json.JSONObject
-import kotlin.math.log
 
 open class AudioRunnable: Runnable {
   /** Identify logcat messages. */
-  private val logTag = "audioLogger"
+  private val logTag = "audioRunnable"
   /** We use this to indicate to the sensor thread if we have data to send. */
   var hasData = false
   /** Use this control variable to stop the recording of audio data. */
@@ -77,21 +76,23 @@ open class AudioRunnable: Runnable {
     )
 
     if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
-      Log.e("Audio Error", "AudioRecord has not been initialized properly.")
+      Log.e(logTag, "AudioRecord has not been initialized properly.")
       return
     }
+    stopThread = false
+
     while (!stopThread) {
       audioRecord.read(audioBuffer, 0, audioBuffer.size)
-      var lowest: Short = 0
-      var highest: Short = 0
+      var lowest = 0f
+      var highest = 0f
       var zeroes = 0
-      var lastValue: Short = 0
+      var lastValue = 0
 
       // Exploring the buffer. Record the highest and lowest readings
       audioBuffer.forEach { anAudioBuffer ->
 
-        lowest = if(anAudioBuffer < lowest) anAudioBuffer else lowest
-        highest = if(anAudioBuffer > highest) anAudioBuffer else highest
+        lowest = if(anAudioBuffer < lowest) anAudioBuffer.toFloat() else lowest
+        highest = if(anAudioBuffer > highest) anAudioBuffer.toFloat() else highest
         // Down and coming up
         if (anAudioBuffer > 0 && lastValue < 0) {
           zeroes++
@@ -100,17 +101,18 @@ open class AudioRunnable: Runnable {
         if (anAudioBuffer < 0 && lastValue > 0) {
           zeroes++
         }
-        lastValue = anAudioBuffer
+        lastValue = anAudioBuffer.toInt()
         // Calculate highest and lowest peak difference as a % of the max possible
         // value
-        amplitude = (highest - lowest) / 65536f * 100f
+        amplitude = (highest - lowest) / 65536 * 100
         // Take the count of the peaks in the time that we had based on the sample
         // rate to calculate frequency
 
-        val seconds: Float = audioBuffer.size / sampleRate.toFloat()
+        val seconds = audioBuffer.size / sampleRate.toFloat()
         frequency = zeroes / seconds / 2
-        hasData = true
-        Log.e(logTag, "Audio Runnable has data!!")
+
+        hasData = ( !frequency.isNaN() && !amplitude.isNaN() )
+
 
       }
 
@@ -126,10 +128,8 @@ open class AudioRunnable: Runnable {
       passedJson.put("frequency", frequency)
       passedJson.put("amplitude", amplitude)
     } catch (jsonEx: JSONException) {
-      Log.e(logTag, "Error adding data to json. ")
-      return passedJson
+      Log.e(logTag, "Error adding data to json. Frequency: $frequency : Amplitude: $amplitude")
     }
-    audioBuffer = ShortArray(0)
     hasData = false
     return passedJson
   }

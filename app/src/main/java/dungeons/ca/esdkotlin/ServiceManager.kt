@@ -209,7 +209,6 @@ class ServiceManager : Service() {
    */
   fun setAudioPower( power: Boolean ) {
     audioLogging = power
-    if( sensorListener.isAlive )
     sensorListener.setAudioPower(power)
   }
 

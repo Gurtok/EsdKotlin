@@ -42,30 +42,35 @@ class MainActivity : Activity(){
   /** Refresh time in milliseconds. Default = 250ms. */
   var sensorRefreshTime: Int = 250
 
-  private val gpsPermissionArray = Array(2){
-    Manifest.permission.ACCESS_FINE_LOCATION
-    Manifest.permission.ACCESS_COARSE_LOCATION  }
+  private val gpsRequestPermissionCode = 123123
+  private val audioRequestPermissionCode = 456456
+
+  private var gpsFinePermission = false
+  private var audioPermission = false
+
+  private val gpsPermissionArray = Array(1){ Manifest.permission.ACCESS_FINE_LOCATION}
 
   private val audioPermissionArray = Array(1){ Manifest.permission.RECORD_AUDIO }
 
   /** This scheduled thread will run the UI screen updates. */
-  var updateTimer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+  private var updateTimer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
   /** The current database population. Probably does not need to be a long, research how sql deals with IDs. */
-  lateinit var sensorTV: TextView
-  lateinit var documentsTV: TextView
-  lateinit var gpsTV: TextView
-  lateinit var errorsTV: TextView
-  lateinit var audioTV: TextView
-  lateinit var databaseTV: TextView
-  /** Number of sensor readings this session */
-  var sensorReadings: Int = 0
-  var documentsIndexed: Int = 0
-  var databasePopulation: Int = 0
-  var gpsReadings: Int = 0
-  var uploadErrors: Int = 0
-  var audioReadings: Int = 0
+  private lateinit var sensorTV: TextView
+  private lateinit var documentsTV: TextView
+  private lateinit var gpsTV: TextView
+  private lateinit var errorsTV: TextView
+  private lateinit var audioTV: TextView
+  private lateinit var databaseTV: TextView
 
-  lateinit var startIntent:Intent
+  /** Number of sensor readings this session */
+  private var sensorReadings: Int = 0
+  private var documentsIndexed: Int = 0
+  private var databasePopulation: Int = 0
+  private var gpsReadings: Int = 0
+  private var uploadErrors: Int = 0
+  private var audioReadings: Int = 0
+
+  private lateinit var startIntent:Intent
 
 
   private var updateRunnable: Runnable = Runnable {
@@ -172,26 +177,39 @@ class MainActivity : Activity(){
     // Radio button to indicate if we should be sampling gps location data.
     val gpsCheckBox = findViewById<CheckBox>(R.id.gpsCheckBox)
     gpsCheckBox.setOnCheckedChangeListener{ _, isChecked ->
-      // If gps button is turned ON.
-      if (!gpsPermission() && isChecked) {
-        gpsCheckBox.toggle()
-        Toast.makeText(applicationContext, "GPS access denied.", Toast.LENGTH_SHORT).show()
-      } else {
-        if(isBound)
-          serviceManager.setGpsPower( isChecked )
+      if(isBound){
+        // If gps button is turned ON.
+        if (isChecked) {
+          // Make sure we have permission each time the button is turned on.
+          ActivityCompat.requestPermissions(this, gpsPermissionArray, gpsRequestPermissionCode )
+          if(gpsPermission()){
+            serviceManager.setGpsPower( true )
+          }else {
+            gpsCheckBox.toggle()
+            Toast.makeText(applicationContext, "GPS access denied.", Toast.LENGTH_SHORT).show()
+          }
+        }else{
+          serviceManager.setGpsPower( false )
+        }
       }
     }
 
     // Radio button to indicate if we should be sampling audio data from MIC.
     val audioCheckBox = findViewById<CheckBox>(R.id.audioCheckBox)
     audioCheckBox.setOnCheckedChangeListener{ _, isChecked ->
-      // If audio button is turned ON.
-      if (!audioPermission() && isChecked) {
-        audioCheckBox.toggle()
-        Toast.makeText(applicationContext, "Audio access denied.", Toast.LENGTH_SHORT).show()
-      } else {
-        if(isBound)
-          serviceManager.setAudioPower( isChecked )
+      if (isBound){
+        // If audio button is turned ON.
+        if (isChecked) {
+          ActivityCompat.requestPermissions(this, audioPermissionArray, audioRequestPermissionCode)
+          if( audioPermission() ){
+            serviceManager.setAudioPower( true )
+          }else{
+            audioCheckBox.toggle()
+            Toast.makeText(applicationContext, "Audio access denied.", Toast.LENGTH_SHORT).show()
+          }
+        }else{
+          serviceManager.setAudioPower( false )
+        }
       }
     }
 
@@ -223,23 +241,32 @@ class MainActivity : Activity(){
    * @return True if we asked for permission and it was granted.
    */
   private fun gpsPermission(): Boolean{
-    ActivityCompat.requestPermissions(this, gpsPermissionArray, MODE_PRIVATE )
-    val gpsPermissionCoarse = (ContextCompat.checkSelfPermission(this, Manifest.permission.
-        ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
-    val gpsPermissionFine = (ContextCompat.checkSelfPermission(this, android.Manifest.permission.
-        ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
-    return (gpsPermissionFine || gpsPermissionCoarse)
+    gpsFinePermission = (ContextCompat.checkSelfPermission(this, gpsPermissionArray[0]) == PackageManager.PERMISSION_GRANTED)
+    return gpsFinePermission
   }
 
   /**
-   * Prompt user for MICROPHONE access.
+   * Prompt user for GPS access.
    * Write this result to shared preferences.
    * @return True if we asked for permission and it was granted.
    */
   private fun audioPermission(): Boolean{
-    ActivityCompat.requestPermissions(this, audioPermissionArray, 1)
-    return (ContextCompat.checkSelfPermission(this,
-        Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+    audioPermission = (ContextCompat.checkSelfPermission(this, audioPermissionArray[0]) == PackageManager.PERMISSION_GRANTED)
+    return audioPermission
+  }
+
+
+  override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>?, grantResults: IntArray?) {
+    if (permissions != null) {
+      when (requestCode) {
+        gpsRequestPermissionCode -> {
+          gpsFinePermission = (grantResults?.get(0) == 0)
+        }
+         audioRequestPermissionCode -> {
+           audioPermission = (grantResults?.get(0) == 0)
+         }
+      }
+    }
   }
 
   /** If our activity is paused, we need to indicate to the service manager via a static variable. */

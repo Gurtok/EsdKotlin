@@ -8,7 +8,7 @@
     android:paddingLeft="8dp"
     android:paddingRight="8dp"
     android:paddingTop="8dp"
-    tools:context="ca.dungeons.sensordump.MainActivity"
+    tools:context="dungeons.ca.esdkotlin.MainActivity"
     tools:ignore="Overdraw">
 
 

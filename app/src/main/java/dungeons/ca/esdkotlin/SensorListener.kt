@@ -4,19 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorManager
 import android.location.LocationManager
 import android.os.BatteryManager
-import android.support.v4.content.ContextCompat
 import android.util.Log
 import org.json.JSONException
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -25,7 +22,7 @@ import java.util.concurrent.Executors
   */
 
 
-open class SensorListener constructor(context: Context ,passedDbHelper: DatabaseHelper, serviceManger: ServiceManager ): Thread(), android.hardware.SensorEventListener{
+open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serviceManger: ServiceManager ): Thread(), android.hardware.SensorEventListener{
 
   /** Use this to identify this classes log messages. */
   private val logTag = "SensorListener"
@@ -69,12 +66,9 @@ open class SensorListener constructor(context: Context ,passedDbHelper: Database
   private var gpsRegistered = false
 // AUDIO variables.
   /** Helper class for obtaining audio data. */
-  private var audioRunnable: AudioRunnable = AudioRunnable()
+  private var audioRunnable = AudioRunnable()
   /** Control variable to make sure we only create one audio logger. */
   private var audioRegistered = false
-
-  init{
-  }
 
   /** Listener for battery updates. */
   private var batteryReceiver = object: BroadcastReceiver(){
@@ -212,43 +206,34 @@ open class SensorListener constructor(context: Context ,passedDbHelper: Database
   fun setGpsPower( power: Boolean ) {
     //Log.e( logTag, "Set gps power: " + power );
     if (power && sensorLogging && !gpsRegistered) { registerGpsSensors() }
-    if (!power && gpsRegistered) { unRegisterGpsSensors() }
+    if (!power && sensorLogging && gpsRegistered) { unRegisterGpsSensors() }
   }
 
 
   /** Register gps sensors to enable recording. */
   private fun registerGpsSensors() {
-    if( !gpsRegistered ){
-      val gpsPermissionFine = (ContextCompat.checkSelfPermission(passedContext.applicationContext, android.Manifest.permission.
-          ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
-      val gpsPermissionCoarse = (ContextCompat.checkSelfPermission(passedContext.applicationContext, android.Manifest.permission.
-          ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
-      try {
-        if ( gpsPermissionFine || gpsPermissionCoarse ) {
-          locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, sensorRefreshTime - 10L, 0f, gpsLogger)
-          locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, sensorRefreshTime - 10L, 0f, gpsLogger)
-          Log.i(logTag, "GPS listeners registered.")
-          gpsRegistered = true
-        } else {
-          Log.e(logTag + "regGPS", "Register gps method, gpsPermissionFine == false")
-        }
-      } catch ( secEx: SecurityException) {
-        Log.e(logTag, "Failure turning gps on/off. Cause: " + secEx.message)
-        secEx.printStackTrace()
-      } catch (runTimeEx: RuntimeException) {
-        Log.e(logTag, "StackTrace: ")
-        runTimeEx.printStackTrace()
-      }
+
+
+    try {
+      locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, sensorRefreshTime - 10L, 0f, gpsLogger)
+      locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, sensorRefreshTime - 10L, 0f, gpsLogger)
+      Log.i(logTag, "GPS listeners registered.")
+      gpsRegistered = true
+    } catch ( secEx: SecurityException) {
+      Log.e(logTag, "Failure turning gps on/off. Cause: " + secEx.message)
+      secEx.printStackTrace()
+    } catch (runTimeEx: RuntimeException) {
+      Log.e(logTag, "StackTrace: ")
+      runTimeEx.printStackTrace()
     }
+
   }
 
   /** Unregister gps sensors. */
   private fun unRegisterGpsSensors() {
-    if( gpsRegistered ){
-      locationManager.removeUpdates(gpsLogger)
-      gpsRegistered = false
-      Log.i(logTag, "GPS unregistered.")
-    }
+    locationManager.removeUpdates(gpsLogger)
+    gpsRegistered = false
+    Log.i(logTag, "GPS unregistered.")
   }
 
   //AUDIO
@@ -259,28 +244,24 @@ open class SensorListener constructor(context: Context ,passedDbHelper: Database
     if (power && sensorLogging && !audioRegistered) {
       registerAudioSensors()
     }
-    if (!power && audioRegistered) {
+    if (!power && sensorLogging  && audioRegistered) {
       unregisterAudioSensors()
     }
   }
 
   /** Register audio recording thread. */
   private fun registerAudioSensors() {
-    if( !audioRegistered ){
-      audioRunnable = object: AudioRunnable(){}
-      audioThread.submit(audioRunnable)
-      audioRegistered = true
-      Log.i(logTag, "Registered audio sensors.")
-    }
+    audioThread.submit(audioRunnable)
+    audioRegistered = true
+    Log.i(logTag, "Registered audio sensors.")
+
   }
 
   /** Stop audio recording thread. */
   private fun unregisterAudioSensors() {
-    if( audioRegistered ){
-      audioRunnable.setStopAudioThread()
-      audioRegistered = false
-      Log.i(logTag, "Unregistered audio sensors.")
-    }
+    audioRunnable.setStopAudioThread()
+    audioRegistered = false
+    Log.i(logTag, "Unregistered audio sensors.")
   }
 
 

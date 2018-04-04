@@ -46,7 +46,7 @@ class Indexer( uploads: UploadThread): Thread() {
   /** Reference to the calling class. */
   private var passedUploadThread = uploads
   /** Used to establish outside connection. */
-  private lateinit var httpCon: HttpURLConnection
+  private lateinit var esUrlConnection: HttpURLConnection
   /** Variable to keep track if this instance of the indexer has submitted a map. */
   private var alreadySentMapping = false
 
@@ -62,6 +62,7 @@ class Indexer( uploads: UploadThread): Thread() {
       createMapping()
       alreadySentMapping = true
     }
+
     if ( !uploadString.isEmpty() ){
       index(uploadString)
     }else{
@@ -86,7 +87,7 @@ class Indexer( uploads: UploadThread): Thread() {
     // Connect to elastic using PUT to make elastic understand this is a mapping.
     if ( connect("PUT") ) {
       try {
-        val dataOutputStream = DataOutputStream(httpCon.outputStream)
+        val dataOutputStream = DataOutputStream(esUrlConnection.outputStream)
         // Lowest json level, contains explicit typing of sensor data.
         val mappingTypes = JSONObject()
         // Type "start_location" && "location" using pre-defined typeGeoPoint. ^^
@@ -112,7 +113,7 @@ class Indexer( uploads: UploadThread): Thread() {
       } catch ( IoEx:IOException ) {
         Log.e("$logTag: createMap", "Failed to write to outputStreamWriter.")
       }
-      httpCon.disconnect()
+      esUrlConnection.disconnect()
     }
   }
 
@@ -122,7 +123,7 @@ class Indexer( uploads: UploadThread): Thread() {
     if ( connect("POST") ) {
       // POST our documents to elastic.
       try {
-        val dataOutputStream = DataOutputStream(httpCon.outputStream)
+        val dataOutputStream = DataOutputStream(esUrlConnection.outputStream)
         dataOutputStream.writeBytes(uploadString)
         // Check status of post operation.
         if (checkResponseCode()) {
@@ -136,7 +137,7 @@ class Indexer( uploads: UploadThread): Thread() {
         // Error writing to httpConnection.
         Log.e("$logTag: esIndex.", IOex.message)
       }
-      httpCon.disconnect()
+      esUrlConnection.disconnect()
     }
   }
 
@@ -160,33 +161,29 @@ class Indexer( uploads: UploadThread): Thread() {
           "PUT" -> {
             // Create and map the index itself.
 
-            httpCon =  if( esSSL ) mapUrl.openConnection() as HttpsURLConnection
-                              else mapUrl.openConnection() as HttpURLConnection
+            esUrlConnection =  if( esSSL ) mapUrl.openConnection() as HttpsURLConnection
+                                else mapUrl.openConnection() as HttpURLConnection
 
-            httpCon.doOutput = true
-            httpCon.doInput = true
-            httpCon.setRequestProperty("Content-Type", "application/json" )
-            httpCon.connectTimeout = 2000
-            httpCon.readTimeout = 2000
-            httpCon.requestMethod = verb
-            httpCon.connect()
-            // Reset the failure count.
-            connectFailCount = 0
+            esUrlConnection.doOutput = true
+            esUrlConnection.doInput = true
+            esUrlConnection.setRequestProperty("Content-Type", "application/json" )
+            esUrlConnection.connectTimeout = 2000
+            esUrlConnection.readTimeout = 2000
+            esUrlConnection.requestMethod = verb
+            esUrlConnection.connect()
             return true
           }
           "POST" -> {
             // For sending index data.
-            httpCon = if( esSSL ) postUrl.openConnection() as HttpsURLConnection
-                      else postUrl.openConnection() as HttpURLConnection
-            httpCon.doOutput = true
-            httpCon.doInput = true
-            httpCon.setRequestProperty("Content-Type", "application/json" )
-            httpCon.connectTimeout = 2000
-            httpCon.readTimeout = 2000
-            httpCon.requestMethod = verb
-            httpCon.connect()
-            // Reset the failure count.
-            connectFailCount = 0
+            esUrlConnection = if( esSSL ) postUrl.openConnection() as HttpsURLConnection
+                                else postUrl.openConnection() as HttpURLConnection
+            esUrlConnection.doOutput = true
+            esUrlConnection.doInput = true
+            esUrlConnection.setRequestProperty("Content-Type", "application/json" )
+            esUrlConnection.connectTimeout = 2000
+            esUrlConnection.readTimeout = 2000
+            esUrlConnection.requestMethod = verb
+            esUrlConnection.connect()
             return true
           }
           else -> {
@@ -210,14 +207,14 @@ class Indexer( uploads: UploadThread): Thread() {
     var responseMessage = "ResponseCode placeholder."
     var responseCode = 0
     try {
-      responseMessage = httpCon.responseMessage
-      responseCode = httpCon.responseCode
+      responseMessage = esUrlConnection.responseMessage
+      responseCode = esUrlConnection.responseCode
       /*
       Since we are receiving a response code after establishing a connection, elastic is simply
         telling us that we do not need to upload a mapping, as the index already exists. Thus we
           get the error code 400.
       */
-      if( httpCon.requestMethod == "POST" && responseCode == 400 ){
+      if( esUrlConnection.requestMethod == "PUT" && responseCode == 400 ){
         return true
       }
       if (responseCode in 200..299 ) {
@@ -231,7 +228,7 @@ class Indexer( uploads: UploadThread): Thread() {
           String.format("%s%s\n%s%s\n%s",
           "Bad response code: ", responseCode,
           "Response Message: ", responseMessage,
-          "$httpCon request type: " + httpCon.requestMethod)// End string.
+          "$esUrlConnection request type: " + esUrlConnection.requestMethod)// End string.
       )
     }
     return false

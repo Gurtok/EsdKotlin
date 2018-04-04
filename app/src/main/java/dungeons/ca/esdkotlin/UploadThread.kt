@@ -41,7 +41,7 @@ class UploadThread( passedPreferences: SharedPreferences,
          private var dbHelper: DatabaseHelper): Runnable {
 
   /** Static variable for the indexer thread to communicate success or failure of an index attempt. */
-  var uploadSuccess = false
+  private var uploadSuccess = false
   /** Control variable to indicate if we should stop uploading to elastic. */
   private var stopUploadThread = false
   /** Name of the elastic index to ID the data. */
@@ -76,6 +76,7 @@ class UploadThread( passedPreferences: SharedPreferences,
   override fun run() {
     working = true
     Log.e(logTag, "Started upload thread.")
+    stopUploadThread = false
     startUploading()
     Log.e(logTag, "Stopped upload thread.")
     working = false
@@ -112,16 +113,20 @@ class UploadThread( passedPreferences: SharedPreferences,
   /** Main work of upload runnable is accomplished here. */
   private fun startUploading() {
     var globalUploadTimer = System.currentTimeMillis()
-    stopUploadThread = false
+
     /* Loop to keep uploading. */
     while (!stopUploadThread) {
+
+
       // If we have gone more than 20 seconds without an update, stop the thread.
       if(System.currentTimeMillis() > globalUploadTimer + 20000 && dbHelper.databaseEntries() < 10 ){
         stopUploadThread = true
         return
       }
+
       // One bulk upload per 5 seconds.
       if (System.currentTimeMillis() > globalUploadTimer + 5000 && dbHelper.databaseEntries() > 100 ) {
+        Log.e("$logTag: startUpload", "Upload loop!!")
         /* If we cannot establish a connection with the elastic server. */
         if (!checkForElasticHost()) {
           // This thread is not working.
@@ -151,8 +156,12 @@ class UploadThread( passedPreferences: SharedPreferences,
             serviceManager.uploadSuccess(false, dbHelper.getDeleteCount() )
           }
         }
+
       }
+
+
     }
+
   }
 
   /**
@@ -197,42 +206,46 @@ class UploadThread( passedPreferences: SharedPreferences,
 
     // Secured Connection
     if (esSSL) {
+      // Add secured protocol to host name.
+      val esUrl = URL(String.format("https://%s:%s", esHost, esPort))
+
+
+      // Required for SSL.
+      if (esUsername.isNotEmpty() && esPassword.isNotEmpty() ) {
+        esIndexer.esUsername = esUsername
+        esIndexer.esPassword = esPassword
+
+        Authenticator.setDefault(object : Authenticator() {
+          override fun getPasswordAuthentication(): PasswordAuthentication {
+            return PasswordAuthentication(esUsername, esPassword.toCharArray())
+          }
+        })
+      }
+
       try {
-        // Add secured protocol to host name.
-        val esUrl = URL(String.format("https://%s:%s", esHost, esPort))
         val httpsConnection = esUrl.openConnection() as HttpsURLConnection
-        // Required for SSL.
-        if (esUsername.isNotEmpty() && esPassword.isNotEmpty() ) {
-          esIndexer.esUsername = esUsername
-          esIndexer.esPassword = esPassword
-
-          Authenticator.setDefault(object : Authenticator() {
-            override fun getPasswordAuthentication(): PasswordAuthentication {
-              return PasswordAuthentication(esUsername, esPassword.toCharArray())
-            }
-          })
-        }
-
         httpsConnection.connectTimeout = 2000
         httpsConnection.readTimeout = 2000
         httpsConnection.connect()
         responseCode = httpsConnection.responseCode
         if (responseCode in 200..299) {
           responseCodeSuccess = true
-          httpsConnection.disconnect()
           updateIndexerUrl(esUrl.toString())
-        }else{
-          Log.e("$logTag: chkHost", "Failure to open connection cause. " + responseCode + " " + httpsConnection.responseMessage)
         }
+        httpsConnection.disconnect()
       } catch ( ex: IOException ) {
         Log.e("$logTag: chkHost", "Failure to open connection cause. " + ex.message + " " + responseCode)
         ex.printStackTrace()
       }
+
+
+
     }else{ // Else NON-secured connection.
+      // Add NON-secured protocol to host name.
+      val esUrl = URL(String.format("http://%s:%s", esHost, esPort))
+
+
       try {
-        // Add NON-secured protocol to host name.
-        val modifiedHostProtocol = String.format("http://%s", esHost)
-        val esUrl = URL(String.format("%s:%s", modifiedHostProtocol, esPort))
         val httpConnection = esUrl.openConnection() as HttpURLConnection
         httpConnection.connectTimeout = 2000
         httpConnection.readTimeout = 2000
@@ -240,15 +253,15 @@ class UploadThread( passedPreferences: SharedPreferences,
         responseCode = httpConnection.responseCode
         if (responseCode in 200..299) {
           responseCodeSuccess = true
-          httpConnection.disconnect()
-          updateIndexerUrl(modifiedHostProtocol)
+          updateIndexerUrl(esUrl.toString())
         }
+        httpConnection.disconnect()
       } catch (ex: IOException) {
         Log.e("$logTag: chkHost", "Failure to open connection cause. " + ex.message + " " + responseCode)
-        //ex.printStackTrace()
       }
-    }
 
+
+    }
 
     // Returns TRUE if the response code was valid.
     return responseCodeSuccess
