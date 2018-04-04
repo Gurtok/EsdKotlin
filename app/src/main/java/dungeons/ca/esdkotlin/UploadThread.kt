@@ -125,8 +125,7 @@ class UploadThread( passedPreferences: SharedPreferences,
       }
 
       // One bulk upload per 5 seconds.
-      if (System.currentTimeMillis() > globalUploadTimer + 5000 && dbHelper.databaseEntries() > 100 ) {
-        Log.e("$logTag: startUpload", "Upload loop!!")
+      if ( System.currentTimeMillis() > globalUploadTimer + 5000 ) {
         /* If we cannot establish a connection with the elastic server. */
         if (!checkForElasticHost()) {
           // This thread is not working.
@@ -137,7 +136,11 @@ class UploadThread( passedPreferences: SharedPreferences,
         }else{
           val nextString = dbHelper.getBulkString(esIndex, esType)
           // If setNextString has data.
-          esIndexer.setNextString( nextString )
+          if( !nextString.isEmpty() ){
+            esIndexer.setNextString( nextString )
+          }else{
+            return
+          }
           try {
             uploadSuccess = false
             // Start the indexing thread, and join to wait for it to finish.
@@ -198,30 +201,27 @@ class UploadThread( passedPreferences: SharedPreferences,
 
   /** Helper method to determine if we currently have access to an elastic server to upload to. */
   private fun checkForElasticHost(): Boolean {
-
     var responseCodeSuccess = false
     var responseCode = 0
     // Get new config info.
     updateConfigurationFromPreferences()
 
+    // Required for SSL.
+    if (esUsername.isNotEmpty() && esPassword.isNotEmpty() ) {
+      esIndexer.esUsername = esUsername
+      esIndexer.esPassword = esPassword
+
+      Authenticator.setDefault(object : Authenticator() {
+        override fun getPasswordAuthentication(): PasswordAuthentication {
+          return PasswordAuthentication(esUsername, esPassword.toCharArray())
+        }
+      })
+    }
+
     // Secured Connection
     if (esSSL) {
       // Add secured protocol to host name.
       val esUrl = URL(String.format("https://%s:%s", esHost, esPort))
-
-
-      // Required for SSL.
-      if (esUsername.isNotEmpty() && esPassword.isNotEmpty() ) {
-        esIndexer.esUsername = esUsername
-        esIndexer.esPassword = esPassword
-
-        Authenticator.setDefault(object : Authenticator() {
-          override fun getPasswordAuthentication(): PasswordAuthentication {
-            return PasswordAuthentication(esUsername, esPassword.toCharArray())
-          }
-        })
-      }
-
       try {
         val httpsConnection = esUrl.openConnection() as HttpsURLConnection
         httpsConnection.connectTimeout = 2000
@@ -238,12 +238,9 @@ class UploadThread( passedPreferences: SharedPreferences,
         ex.printStackTrace()
       }
 
-
-
     }else{ // Else NON-secured connection.
       // Add NON-secured protocol to host name.
       val esUrl = URL(String.format("http://%s:%s", esHost, esPort))
-
 
       try {
         val httpConnection = esUrl.openConnection() as HttpURLConnection
@@ -259,7 +256,6 @@ class UploadThread( passedPreferences: SharedPreferences,
       } catch (ex: IOException) {
         Log.e("$logTag: chkHost", "Failure to open connection cause. " + ex.message + " " + responseCode)
       }
-
 
     }
 

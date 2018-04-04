@@ -10,6 +10,7 @@
         android:summary="Port for ES index. Usually 9200"
         android:title="ES Port" />
     <EditTextPreference
+        android:defaultValue="sensor_dump"
         android:key="index"
         android:summary="Index name for sensor dump. Default is fine."
         android:title="ES Index" />
@@ -18,6 +19,7 @@
         android:summary="Add current date to index name."
         android:title="Date Stamp Index" />
     <EditTextPreference
+        android:defaultValue="phone_index"
         android:key="tag"
         android:summary="Tag sensor data with this string (optional)."
         android:title="ES Tag" />
