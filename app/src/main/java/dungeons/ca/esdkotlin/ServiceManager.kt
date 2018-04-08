@@ -72,40 +72,27 @@ class ServiceManager : Service() {
   private lateinit var sensorListener: SensorListener
 
   /** If we go more than an a half hour without recording any sensor data, shut down this thread. */
-  private lateinit var serviceTimeoutRunnable: Runnable
+  private var serviceTimeoutRunnable = Runnable {
+    // Last sensor result plus 1/2 hour in milliseconds is greater than the current time.
+    val timeCheck = lastSuccessfulSensorTime + (1000 * 60 * 30) > System.currentTimeMillis()
+    if (!logging && !uploads.isWorking() && !timeCheck) {
+      Log.e(logTag, "Shutting down service. Not logging!")
+      stopServiceThread()
+    }
+  }
 
   /** This is the runnable we will use to check network connectivity once every 30 min. */
-  private lateinit var uploadRunnable: Runnable
-
-
+  private var uploadRunnable = Runnable {
+    if (!uploads.isWorking()) {
+      workingThreadPool.submit(uploads)
+    } else if ( uploads.isWorking() ) {
+      Log.i(logTag, "Uploading already in progress.")
+    } else {
+      Log.e(logTag, "Failed to submit uploads runnable to thread pool!")
+    }
+  }
 
   override fun onCreate() {
-    val sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
-    dbHelper = DatabaseHelper(application.applicationContext)
-
-    sensorListener = SensorListener(baseContext, dbHelper, this)
-    uploads = UploadThread(sharedPrefs, this, dbHelper)
-
-
-    serviceTimeoutRunnable = Runnable {
-      // Last sensor result plus 1/2 hour in milliseconds is greater than the current time.
-      val timeCheck = lastSuccessfulSensorTime + (1000 * 60 * 30) > System.currentTimeMillis()
-      if (!logging && !uploads.isWorking() && !timeCheck) {
-        Log.e(logTag, "Shutting down service. Not logging!")
-        stopServiceThread()
-      }
-    }
-
-    uploadRunnable = Runnable {
-      if (!uploads.isWorking()) {
-        workingThreadPool.submit(uploads)
-      } else if (uploads.isWorking()) {
-        Log.e(logTag, "Uploading already in progress.")
-      } else {
-        Log.e(logTag, "Failed to submit uploads runnable to thread pool!")
-      }
-    }
-
   }
 
   /** Return a reference to this instance of the service. */
@@ -127,8 +114,12 @@ class ServiceManager : Service() {
    * @return START_STICKY will make sure the OS restarts this process if it has to trim memory.
    */
   override fun onStartCommand( intent: Intent, flags: Int, startId: Int ): Int {
-    //Log.e(logTag, "ESD -- On Start Command." )
-    if (!serviceActive) {
+    Log.e(logTag, "ESD -- On Start Command." )
+    if ( !serviceActive ) {
+      dbHelper = DatabaseHelper( applicationContext  )
+      val sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
+      sensorListener = SensorListener(baseContext, dbHelper, this)
+      uploads = UploadThread(sharedPrefs, this, dbHelper)
 
       lastSuccessfulSensorTime = System.currentTimeMillis()
       /* Use SensorRunnable class to start the logging process. */
@@ -154,7 +145,10 @@ class ServiceManager : Service() {
     outBundle.putInt("audioReadings", audioReadings)
     outBundle.putInt("documentsIndexed", documentsIndexed)
     outBundle.putInt("uploadErrors", uploadErrors)
-    outBundle.putLong("databasePopulation", dbHelper.databaseEntries())
+    if(::dbHelper.isInitialized){
+      outBundle.putLong("databasePopulation", dbHelper.databaseEntries() )
+    }
+
     return outBundle
   }
 
@@ -165,7 +159,6 @@ class ServiceManager : Service() {
    * @param audioReading - Boolean AUDIO sensor data.
    */
   fun sensorSuccess( gpsReading: Boolean, audioReading: Boolean ) {
-
     sensorReadings++
     if (gpsReading)
       gpsReadings++
@@ -179,7 +172,6 @@ class ServiceManager : Service() {
    * @param count  - Integer, how many records were indexed.
    */
   fun uploadSuccess( result: Boolean, count: Int) {
-
     if (result)
       documentsIndexed += count
     else
@@ -221,15 +213,19 @@ class ServiceManager : Service() {
    */
   fun startLogging() {
     logging = true
-    sensorListener.setSensorPower(true)
-    sensorListener.setGpsPower(gpsLogging)
-    sensorListener.setAudioPower(audioLogging)
+    if(serviceActive){
+      sensorListener.setSensorPower(true)
+      sensorListener.setGpsPower(gpsLogging)
+      sensorListener.setAudioPower(audioLogging)
+    }
   }
 
   /** Stop the sensor listener. */
   fun stopLogging() {
     logging = false
-    sensorListener.setSensorPower(false)
+    if( serviceActive ){
+      sensorListener.setSensorPower(false)
+    }
   }
 
   /**
@@ -238,8 +234,10 @@ class ServiceManager : Service() {
    * 2. Stop upload thread.
    */
   override fun onDestroy() {
-    sensorListener.stopThread()
-    uploads.stopUploading()
+    if(serviceActive){
+      sensorListener.stopThread()
+      uploads.stopUploading()
+    }
     super.onDestroy()
   }
 

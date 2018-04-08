@@ -12,18 +12,11 @@ import android.os.IBinder
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.util.Log
-import android.widget.CheckBox
-import android.widget.ImageButton
-import android.widget.SeekBar
-import android.widget.TextView
-import android.widget.Toast
-import android.widget.ToggleButton
-
+import android.widget.*
+import dungeons.ca.esdkotlin.ServiceManager.ServiceBinder
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
-import dungeons.ca.esdkotlin.ServiceManager.ServiceBinder
-
 
 
 /** Created by Gurtok on 3/11/2018 */
@@ -35,8 +28,7 @@ class MainActivity : Activity(){
   private val logTag = "MainActivity"
   /** Do NOT record more than once every 50 milliseconds. Default value is 250ms. */
   private val minSensorRefresh = 50
-  /** The backend service that runs data collection and uploading. */
-  lateinit var serviceManager: ServiceManager
+
   /** If the UI thread is active, it should be bound to the service manager. */
   var isBound = false
   /** Refresh time in milliseconds. Default = 250ms. */
@@ -54,6 +46,7 @@ class MainActivity : Activity(){
 
   /** This scheduled thread will run the UI screen updates. */
   private var updateTimer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+
   /** The current database population. Probably does not need to be a long, research how sql deals with IDs. */
   private lateinit var sensorTV: TextView
   private lateinit var documentsTV: TextView
@@ -73,30 +66,33 @@ class MainActivity : Activity(){
   private lateinit var startIntent:Intent
 
 
-  private var updateRunnable: Runnable = Runnable {
-    run{
-      runOnUiThread( { updateScreen() } )
-    }
-  }
+  /** The backend service that runs data collection and uploading. */
+  private var serviceManager = ServiceManager()
 
-  private var serviceManagerConnection =  object: ServiceConnection {
+
+
+  private var serviceManagerConnection = object: ServiceConnection {
     override fun onServiceConnected(name: ComponentName, service: IBinder) {
+      Log.i(logTag, "We are bound to the service manager!")
       serviceManager = (service as ServiceBinder).getService()
       isBound = true
     }
-
     override fun onServiceDisconnected(p0: ComponentName?) {
       isBound = false
     }
   }
 
+  private var updateRunnable = Runnable {
+    run{
+      runOnUiThread( { updateScreen() } )
+    }
+  }
+
+
+
   override fun onCreate(savedInstanceState: Bundle?) {
-    startServiceManager()
-
+    super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
-    buildButtonLogic()
-
-    updateTimer.scheduleAtFixedRate(updateRunnable, 500, 500, TimeUnit.MILLISECONDS )
 
     sensorTV = findViewById(R.id.sensor_tv)
     documentsTV = findViewById(R.id.documents_tv)
@@ -105,21 +101,23 @@ class MainActivity : Activity(){
     audioTV = findViewById(R.id.audioCount)
     databaseTV = findViewById(R.id.databaseCount)
 
+    buildButtonLogic()
 
-    super.onCreate(savedInstanceState)
-    Log.e(logTag, "Started Main Activity!")
-  }
-
-  private fun startServiceManager(){
-    serviceManager = ServiceManager()
     startIntent  = Intent(this, serviceManager::class.java)
     startService( startIntent )
+
+    Log.i(logTag, "Started Main Activity!")
+  }
+
+  override fun onStart() {
+    super.onStart()
+    Log.i(logTag, "onStart!!")
     bindService( startIntent, serviceManagerConnection, Context.BIND_AUTO_CREATE )
   }
 
-  /** Call service manager to receive a bundle of updated data counts. */
-  private fun getScreenUpdates(){
-    if( isBound ){
+  /** Call for updates, then update the display. */
+  private fun updateScreen(){
+    if(isBound) {
       val dataBundle:Bundle = serviceManager.updateUiData()
       sensorReadings = dataBundle.getInt("sensorReadings" )
       documentsIndexed = dataBundle.getInt("documentsIndexed" )
@@ -128,11 +126,7 @@ class MainActivity : Activity(){
       audioReadings = dataBundle.getInt("audioReadings" )
       databasePopulation = dataBundle.getLong("databasePopulation" ).toInt()
     }
-  }
 
-  /** Call for updates, then update the display. */
-  private fun updateScreen(){
-    getScreenUpdates()
     sensorTV.text = sensorReadings.toString()
     documentsTV.text = documentsIndexed.toString()
     gpsTV.text = gpsReadings.toString()
@@ -140,6 +134,8 @@ class MainActivity : Activity(){
     audioTV.text = audioReadings.toString()
     databaseTV.text = databasePopulation.toString()
 
+    val seekbarText = findViewById<TextView>(R.id.TickText)
+    seekbarText.text = String.format("${getString(R.string.Collection_Interval)} $sensorRefreshTime ${getString(R.string.milliseconds)}" )
   }
 
   /**
@@ -217,6 +213,7 @@ class MainActivity : Activity(){
     val seekbar = findViewById<SeekBar>(R.id.seekBar)
     val seekbarText = findViewById<TextView>(R.id.TickText)
     seekbar.setOnSeekBarChangeListener( object: SeekBar.OnSeekBarChangeListener{
+
       override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
         if ( progress * 10 < minSensorRefresh ) {
           Toast.makeText(applicationContext, "Minimum sensor refresh is 50 ms", Toast.LENGTH_SHORT).show()
@@ -273,20 +270,23 @@ class MainActivity : Activity(){
   override fun onPause() {
     super.onPause()
     unbindService(serviceManagerConnection)
-    isBound = false
   }
 
   /**
    * When the activity starts or resumes, we start the upload process immediately.
    */
   override fun onResume() {
+    bindService( startIntent, serviceManagerConnection, Context.BIND_AUTO_CREATE )
+    updateTimer.scheduleAtFixedRate(updateRunnable, 1000, 500, TimeUnit.MILLISECONDS )
+
     super.onResume()
-    isBound = bindService( startIntent, serviceManagerConnection, Context.BIND_AUTO_CREATE )
   }
 
   /** If the user exits the application. */
   override fun onDestroy() {
-    serviceManager.stopServiceThread()
+    if(isBound)
+      serviceManager.stopServiceThread()
+
     updateTimer.shutdown()
     super.onDestroy()
   }

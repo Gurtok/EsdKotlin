@@ -122,13 +122,15 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
         if (batteryLevel > 0) {
           joSensorData.put("battery_percentage", batteryLevel)
         }
-        for ( cursor in event.values ) {
+
+        for ( (index, cursor: Float) in event.values.withIndex() ) {
           if (!cursor.isNaN() && cursor < Long.MAX_VALUE && cursor > Long.MIN_VALUE) {
-            sensorHierarchyName = event.sensor.stringType.split("\\.")
-            sensorName = if (sensorHierarchyName.isEmpty() )  event.sensor.stringType else sensorHierarchyName[sensorHierarchyName.size - 1]
+            sensorHierarchyName = event.sensor.stringType.split("\\.".toRegex())
+            sensorName = sensorHierarchyName[sensorHierarchyName.size - 1] + " $index"
             joSensorData.put(sensorName, cursor)
           }
         }
+
         dbHelper.jsonToDatabase(joSensorData)
         serviceManager.sensorSuccess(gpsReading, audioReading)
         lastUpdate = System.currentTimeMillis()
@@ -212,8 +214,6 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
 
   /** Register gps sensors to enable recording. */
   private fun registerGpsSensors() {
-
-
     try {
       locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, sensorRefreshTime - 10L, 0f, gpsLogger)
       locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, sensorRefreshTime - 10L, 0f, gpsLogger)
@@ -226,7 +226,6 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
       Log.e(logTag, "StackTrace: ")
       runTimeEx.printStackTrace()
     }
-
   }
 
   /** Unregister gps sensors. */

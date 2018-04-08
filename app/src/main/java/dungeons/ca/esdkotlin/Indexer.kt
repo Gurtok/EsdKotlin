@@ -15,6 +15,7 @@
  */
 package dungeons.ca.esdkotlin
 
+import android.annotation.SuppressLint
 import android.util.Log
 import org.json.JSONException
 import org.json.JSONObject
@@ -28,36 +29,34 @@ import javax.net.ssl.HttpsURLConnection
  * Elastic Search Indexer.
  * Use this thread to upload data to the elastic server.
  */
-class Indexer( uploads: UploadThread): Thread() {
+class Indexer( uploads: UploadThread ) {
 
   /** Used to identify which class is writing to logCat. */
-  private val logTag = "eSearchIndexer"
+  private val logTag = "esIndexer"
   /** Elastic username. */
   var esUsername = ""
   /** Elastic password. */
   var esPassword = ""
   var esSSL = false
-  /** The URL we use to post data to the server. */
-  lateinit var postUrl:URL
-  /** The URL we use to create an index and PUT a mapping schema on it. */
-  lateinit var mapUrl: URL
+
   /** A variable to hold the JSON string to be uploaded. */
   private var uploadString = ""
   /** Reference to the calling class. */
   private var passedUploadThread = uploads
-  /** Used to establish outside connection. */
-  private lateinit var esUrlConnection: HttpURLConnection
+
   /** Variable to keep track if this instance of the indexer has submitted a map. */
   private var alreadySentMapping = false
 
-
-  /** Base constructor. */
-  init {
-
-  }
+  /** Used to establish outside connection. */
+  private lateinit var esUrlConnection: HttpURLConnection
+  /** The URL we use to post data to the server. */
+  lateinit var postUrl:URL
+  /** The URL we use to create an index and PUT a mapping schema on it. */
+  lateinit var mapUrl: URL
 
   /** This run method is executed upon each index start. */
-  override fun run() {
+  fun indexString() {
+
     if(!alreadySentMapping ){
       createMapping()
       alreadySentMapping = true
@@ -68,8 +67,6 @@ class Indexer( uploads: UploadThread): Thread() {
     }else{
       Log.e("Indexer", "String is empty!!")
     }
-
-
   }
 
   /** Send messages to Upload thread and ESD service thread to indicate result of index. */
@@ -83,6 +80,7 @@ class Indexer( uploads: UploadThread): Thread() {
   }
 
   /** Create a map and send to elastic for sensor index. */
+  @SuppressLint("LongLogTag")
   private fun createMapping() {
     // Connect to elastic using PUT to make elastic understand this is a mapping.
     if ( connect("PUT") ) {
@@ -102,7 +100,7 @@ class Indexer( uploads: UploadThread): Thread() {
         // Write out to elastic using the passed outputStream that is connected.
         dataOutputStream.writeBytes(mappings.toString())
         if (checkResponseCode()) {
-          Log.e("$logTag: createMap", "Successfully uploaded map!")
+          Log.i("$logTag: createMap", "Successfully uploaded map!")
           alreadySentMapping = true
         } else {
           // Send message to upload thread about the failure to upload via intent.
@@ -118,7 +116,8 @@ class Indexer( uploads: UploadThread): Thread() {
   }
 
   /** Send JSON data to elastic using POST. */
-  private fun index( uploadString: String ) {
+  @SuppressLint("LongLogTag")
+  private fun index(uploadString: String ) {
     // Boolean return to check if we successfully connected to the elastic host.
     if ( connect("POST") ) {
       // POST our documents to elastic.
@@ -127,7 +126,6 @@ class Indexer( uploads: UploadThread): Thread() {
         dataOutputStream.writeBytes(uploadString)
         // Check status of post operation.
         if (checkResponseCode()) {
-          Log.e("$logTag: esIndex.", "Uploaded string success!")
           indexSuccess(true)
         } else {
           Log.e("$logTag: esIndex.", "Uploaded string FAILURE!")
@@ -191,10 +189,10 @@ class Indexer( uploads: UploadThread): Thread() {
         }
 
       } catch ( urlEx: MalformedURLException) {
-        Log.e("$logTag: connect.", "Error building URL.")
+        Log.e("$logTag: connect", "Error building URL.")
         connectFailCount++
       } catch ( IOex: IOException) {
-        Log.e("$logTag: connect.", "Failed to connect to elastic. " + IOex.message + "  " + IOex.cause)
+        Log.e("$logTag: connect", "Failed to connect to elastic. " + IOex.message + "  " + IOex.cause)
         connectFailCount++
       }
     }

@@ -77,9 +77,65 @@ class UploadThread( passedPreferences: SharedPreferences,
     working = true
     Log.e(logTag, "Started upload thread.")
     stopUploadThread = false
+
     startUploading()
+
     Log.e(logTag, "Stopped upload thread.")
     working = false
+  }
+
+
+  /** Main work of upload runnable is accomplished here. */
+  private fun startUploading() {
+    var checkedHostOnline = checkForElasticHost()
+    var lastUpdateTimer = System.currentTimeMillis()
+    var checkHostTimer = System.currentTimeMillis()
+
+    /* Check for and do work, while there is work to be done. */
+    do {
+      val systemTime = System.currentTimeMillis()
+      // System timer will only be updated if we are successful with an index operation.
+      // Every 30 seconds, check if upload has been successful. If not, stop this tread.
+      // Every 10 seconds, get an update from preferences, and rebuild the URLs with the new
+      //  host and index names.
+      // Every 1 second, try to upload an index. Reset stop timer if successful.
+      when {
+
+        systemTime > lastUpdateTimer + 30000 -> {
+          stopUploadThread = true
+        }
+
+        systemTime > checkHostTimer + 10000 -> {
+          Log.e(logTag, "Upload loop, check host!")
+          checkedHostOnline = checkForElasticHost()
+          checkHostTimer = System.currentTimeMillis()
+        }
+
+        systemTime > lastUpdateTimer + 3000 -> {
+
+          val nextString = dbHelper.getBulkString(esIndex, esType)
+
+          if ( checkedHostOnline && !nextString.isEmpty() ) {
+            uploadSuccess = false
+            // If nextString has data.
+            esIndexer.setNextString(nextString)
+
+            // Start the indexing the string.
+            esIndexer.indexString()
+
+            if (uploadSuccess) {
+              Log.i("$logTag: startUpload", "Uploaded " + dbHelper.getDeleteCount() + " rows from DB.")
+              lastUpdateTimer = System.currentTimeMillis()
+              serviceManager.uploadSuccess(true, dbHelper.getDeleteCount())
+              dbHelper.deleteUploadedIndices()
+            } else {
+              Log.e("$logTag: startUpload", "Failed index.")
+              serviceManager.uploadSuccess(false, dbHelper.getDeleteCount())
+            }
+          }
+        }
+      }
+    } while (!stopUploadThread)
   }
 
   /** A method to indicate if this thread is currently working. */
@@ -97,7 +153,6 @@ class UploadThread( passedPreferences: SharedPreferences,
   }
 
   private fun updateConfigurationFromPreferences(){
-
     esHost = sharedPreferences.getString("host", "localhost")
     esPort = sharedPreferences.getString("port", "9200")
     esSSL = sharedPreferences.getBoolean("ssl", false)
@@ -107,96 +162,6 @@ class UploadThread( passedPreferences: SharedPreferences,
 
     esUsername = sharedPreferences.getString("user", "")
     esPassword = sharedPreferences.getString("pass", "")
-
-  }
-
-  /** Main work of upload runnable is accomplished here. */
-  private fun startUploading() {
-    var globalUploadTimer = System.currentTimeMillis()
-
-    /* Loop to keep uploading. */
-    while (!stopUploadThread) {
-
-
-      // If we have gone more than 20 seconds without an update, stop the thread.
-      if(System.currentTimeMillis() > globalUploadTimer + 20000 && dbHelper.databaseEntries() < 10 ){
-        stopUploadThread = true
-        return
-      }
-
-      // One bulk upload per 5 seconds.
-      if ( System.currentTimeMillis() > globalUploadTimer + 5000 ) {
-        /* If we cannot establish a connection with the elastic server. */
-        if (!checkForElasticHost()) {
-          // This thread is not working.
-          // We should stop the service if this is true.
-          stopUploadThread = true
-          Log.e("$logTag: startUpload", "No elastic host.")
-          return
-        }else{
-          val nextString = dbHelper.getBulkString(esIndex, esType)
-          // If setNextString has data.
-          if( !nextString.isEmpty() ){
-            esIndexer.setNextString( nextString )
-          }else{
-            return
-          }
-          try {
-            uploadSuccess = false
-            // Start the indexing thread, and join to wait for it to finish.
-            esIndexer.start()
-            esIndexer.join()
-          } catch ( interEx: InterruptedException) {
-            Log.e("$logTag: startUpload", "Failed to join ESI thread, possibly not running.")
-          }
-          if (uploadSuccess) {
-            Log.e( "$logTag: startUpload", "Uploaded " + dbHelper.getDeleteCount() + " rows from DB." )
-            globalUploadTimer = System.currentTimeMillis()
-            serviceManager.uploadSuccess(true, dbHelper.getDeleteCount() )
-            dbHelper.deleteUploadedIndices()
-          }else{
-            Log.e("$logTag: startUpload", "Failed index.")
-            serviceManager.uploadSuccess(false, dbHelper.getDeleteCount() )
-          }
-        }
-
-      }
-
-
-    }
-
-  }
-
-  /**
-   * Extract config information from sharedPreferences.
-   * Tag the current date stamp on the index name if set in preferences. Credit: GlenRSmith.
-   */
-  private fun updateIndexerUrl( modifiedProtocol: String) {
-
-    // Tag the current date stamp on the index name if set in preferences
-    // Thanks GlenRSmith for this idea
-    if (dateTheIndexName) {
-      val logDate = Date(System.currentTimeMillis())
-      val logDateFormat = SimpleDateFormat("yyyyMMdd", Locale.US)
-      val dateString = logDateFormat.format(logDate)
-      esIndex = String.format("%s-%s",esIndex ,dateString )
-    }
-
-    val mappingURL = String.format("%s/%s", modifiedProtocol, esIndex)
-    // Note the different URLs. Regular post ends with type. Mapping ends with index ID.
-    val postingURL = String.format("%s/%s", modifiedProtocol, "_bulk")
-
-    try {
-      esIndexer.mapUrl = URL(mappingURL)
-      esIndexer.postUrl = URL(postingURL)
-    } catch ( malformedUrlEx: MalformedURLException) {
-      Log.e("$logTag: updateIndexer", "Failed to update URLs.")
-      esIndexer.mapUrl = URL("")
-      esIndexer.postUrl = URL("")
-    }
-
-    esIndexer.esSSL = esSSL
-
   }
 
   /** Helper method to determine if we currently have access to an elastic server to upload to. */
@@ -228,11 +193,11 @@ class UploadThread( passedPreferences: SharedPreferences,
         httpsConnection.readTimeout = 2000
         httpsConnection.connect()
         responseCode = httpsConnection.responseCode
+        httpsConnection.disconnect()
         if (responseCode in 200..299) {
           responseCodeSuccess = true
           updateIndexerUrl(esUrl.toString())
         }
-        httpsConnection.disconnect()
       } catch ( ex: IOException ) {
         Log.e("$logTag: chkHost", "Failure to open connection cause. " + ex.message + " " + responseCode)
         ex.printStackTrace()
@@ -248,11 +213,11 @@ class UploadThread( passedPreferences: SharedPreferences,
         httpConnection.readTimeout = 2000
         httpConnection.connect()
         responseCode = httpConnection.responseCode
+        httpConnection.disconnect()
         if (responseCode in 200..299) {
           responseCodeSuccess = true
           updateIndexerUrl(esUrl.toString())
         }
-        httpConnection.disconnect()
       } catch (ex: IOException) {
         Log.e("$logTag: chkHost", "Failure to open connection cause. " + ex.message + " " + responseCode)
       }
@@ -262,5 +227,38 @@ class UploadThread( passedPreferences: SharedPreferences,
     // Returns TRUE if the response code was valid.
     return responseCodeSuccess
   }
+
+  /**
+   * Extract config information from sharedPreferences.
+   * Tag the current date stamp on the index name if set in preferences. Credit: GlenRSmith.
+   */
+  private fun updateIndexerUrl( modifiedProtocol: String ) {
+
+    // Tag the current date stamp on the index name if set in preferences
+    // Thanks GlenRSmith for this idea
+    if (dateTheIndexName) {
+      val logDate = Date(System.currentTimeMillis())
+      val logDateFormat = SimpleDateFormat("yyyyMMdd", Locale.US)
+      val dateString = logDateFormat.format(logDate)
+      esIndex = String.format("%s-%s",esIndex ,dateString )
+    }
+
+    val mappingURL = String.format("%s/%s", modifiedProtocol, esIndex)
+    // Note the different URLs. Regular post ends with type. Mapping ends with index ID.
+    val postingURL = String.format("%s/%s", modifiedProtocol, "_bulk")
+
+    try {
+      esIndexer.mapUrl = URL(mappingURL)
+      esIndexer.postUrl = URL(postingURL)
+    } catch ( malformedUrlEx: MalformedURLException) {
+      Log.e("$logTag: updateIndexer", "Failed to update URLs.")
+      esIndexer.mapUrl = URL("")
+      esIndexer.postUrl = URL("")
+    }
+
+    esIndexer.esSSL = esSSL
+
+  }
+
 
 }

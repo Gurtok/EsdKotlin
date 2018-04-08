@@ -47,7 +47,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
   private var deleteRowId = 0
   /** Used to keep track of supplied database entries in case of upload failure.  */
   private var deleteBulkCount = 0
-  private lateinit var sqlWriteDatabase: SQLiteDatabase
+  private var sqlWriteDatabase: SQLiteDatabase
 
   /**
    * Creates a new dataBase if required on initialization.
@@ -57,11 +57,12 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
   }
   init {
-    Log.e("dbHelper", "Database Count = $databaseCount"  )
+
     val query = "CREATE TABLE IF NOT EXISTS $TABLE_NAME (ID INTEGER PRIMARY KEY, JSON TEXT);"
     sqlWriteDatabase = super.getWritableDatabase()
     sqlWriteDatabase.execSQL(query)
     databaseCount = DatabaseUtils.queryNumEntries(sqlWriteDatabase, DatabaseHelper.TABLE_NAME, null)
+    Log.e("dbHelper", "Database Count = $databaseCount"  )
   }
 
   /** Get number of database entries. */
@@ -101,7 +102,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
   /** Delete a list of rows from database. */
   fun deleteUploadedIndices() {
-    for ( i in 0..deleteBulkCount ) {
+    for ( i in 0..(deleteBulkCount-1) ) {
       sqlWriteDatabase.execSQL("DELETE FROM " + TABLE_NAME + " WHERE ID = " + (deleteRowId + i))
   }
     databaseCount = DatabaseUtils.queryNumEntries(sqlWriteDatabase, DatabaseHelper.TABLE_NAME, null)
@@ -123,22 +124,21 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     var bulkOutString = ""
     val separatorString = "{\"index\":{\"_index\":\"$esIndex\",\"_type\":\"$esType\"}}"
     val newLine = "\n"
-    val outCursor = sqlWriteDatabase.rawQuery("SELECT * FROM " + DatabaseHelper.TABLE_NAME + " ORDER BY ID ASC LIMIT 1000", Array(0,{""} ))
-    deleteBulkCount = outCursor.count
-    outCursor.moveToFirst()
-    deleteRowId = outCursor.getInt(0)
 
-    if (deleteBulkCount != 0) {
+    if( this.databaseEntries() > 1 ){
 
+      val outCursor = sqlWriteDatabase.rawQuery("SELECT * FROM " + DatabaseHelper.TABLE_NAME + " ORDER BY ID ASC LIMIT 500", Array(0,{""} ))
+      deleteBulkCount = outCursor.count
+      outCursor.moveToFirst()
+      deleteRowId = outCursor.getInt(0)
       do{
-
         bulkOutString = String.format("%s%s%s%s%s",bulkOutString, separatorString, newLine, outCursor.getString(1), newLine)
         outCursor.moveToNext()
       }while(!outCursor.isAfterLast)
       outCursor.close()
-      return bulkOutString
     }
-    return ""
+
+    return bulkOutString
   }
 
 
