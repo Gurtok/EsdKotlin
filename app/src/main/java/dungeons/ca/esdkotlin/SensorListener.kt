@@ -126,7 +126,7 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
         for ( (index, cursor: Float) in event.values.withIndex() ) {
           if (!cursor.isNaN() && cursor < Long.MAX_VALUE && cursor > Long.MIN_VALUE) {
             sensorHierarchyName = event.sensor.stringType.split("\\.".toRegex())
-            sensorName = sensorHierarchyName[sensorHierarchyName.size - 1] + " $index"
+            sensorName = sensorHierarchyName[sensorHierarchyName.size - 1] + index
             joSensorData.put(sensorName, cursor)
           }
         }
