@@ -192,10 +192,7 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
       val deviceSensors = mSensorManager.getSensorList(Sensor.TYPE_ALL).toTypedArray()
       usableSensorList = kotlin.collections.mutableListOf()
       for (sensor in deviceSensors) {
-        // Use this to filter out trigger(One-shot) sensors, which are dealt with differently.
-        if (sensor.reportingMode != Sensor.REPORTING_MODE_ONE_SHOT) {
           usableSensorList.add(sensor.type)
-        }
       }
     } catch (nullPtrEx: NullPointerException) {
       Log.e(logTag, "Sensor list is returned null.")
