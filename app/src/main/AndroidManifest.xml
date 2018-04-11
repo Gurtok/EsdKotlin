@@ -34,6 +34,17 @@
             android:label="ESD Service Manager">
         </service>
 
+        <receiver
+            android:name=".ServiceBroadcastReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="Restart service manager if stopped!"
+            android:permission="">
+            <intent-filter>
+                <action android:name = "dungeons.ca.esdKotlin.ServiceBroadcastReceiver"/>
+            </intent-filter>
+        </receiver>
+
 
     </application>
 

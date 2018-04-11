@@ -47,6 +47,7 @@ class MainActivity : Activity(){
   /** This scheduled thread will run the UI screen updates. */
   private var updateTimer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
+
   /** The current database population. Probably does not need to be a long, research how sql deals with IDs. */
   private lateinit var sensorTV: TextView
   private lateinit var documentsTV: TextView
@@ -63,19 +64,18 @@ class MainActivity : Activity(){
   private var uploadErrors: Int = 0
   private var audioReadings: Int = 0
 
-  private lateinit var startIntent:Intent
-
-
   /** The backend service that runs data collection and uploading. */
   private var serviceManager = ServiceManager()
-
+  private var startIntent = Intent()
 
 
   private var serviceManagerConnection = object: ServiceConnection {
     override fun onServiceConnected(name: ComponentName, service: IBinder) {
       Log.i(logTag, "We are bound to the service manager!")
       serviceManager = (service as ServiceBinder).getService()
+      Log.e(logTag, "Service process ID = " + serviceManager.applicationInfo.toString())
       isBound = true
+      updateScreen()
     }
     override fun onServiceDisconnected(p0: ComponentName?) {
       isBound = false
@@ -102,8 +102,7 @@ class MainActivity : Activity(){
     databaseTV = findViewById(R.id.databaseCount)
 
     buildButtonLogic()
-
-    startIntent  = Intent(this, serviceManager::class.java)
+    startIntent = Intent(this, serviceManager::class.java)
     startService( startIntent )
 
     Log.i(logTag, "Started Main Activity!")
@@ -112,7 +111,8 @@ class MainActivity : Activity(){
   override fun onStart() {
     super.onStart()
     Log.i(logTag, "onStart!!")
-    bindService( startIntent, serviceManagerConnection, Context.BIND_AUTO_CREATE )
+
+
   }
 
   /** Call for updates, then update the display. */
@@ -269,24 +269,27 @@ class MainActivity : Activity(){
   /** If our activity is paused, we need to indicate to the service manager via a static variable. */
   override fun onPause() {
     super.onPause()
-    unbindService(serviceManagerConnection)
   }
 
   /**
    * When the activity starts or resumes, we start the upload process immediately.
    */
   override fun onResume() {
-    bindService( startIntent, serviceManagerConnection, Context.BIND_AUTO_CREATE )
-    updateTimer.scheduleAtFixedRate(updateRunnable, 1000, 500, TimeUnit.MILLISECONDS )
+
+    if(isBound){
+      serviceManager.updateUiData()
+    }else{
+      bindService( startIntent, serviceManagerConnection, Context.BIND_AUTO_CREATE )
+    }
+    updateTimer.scheduleAtFixedRate(updateRunnable, 100, 500, TimeUnit.MILLISECONDS )
 
     super.onResume()
   }
 
   /** If the user exits the application. */
   override fun onDestroy() {
-    if(isBound)
-      serviceManager.stopServiceThread()
-
+    unbindService(serviceManagerConnection)
+    serviceManager.stopServiceThread()
     updateTimer.shutdown()
     super.onDestroy()
   }

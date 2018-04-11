@@ -35,6 +35,8 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
   /** The audio runnable is executed on this thread. */
   private val audioThread: ExecutorService = Executors.newSingleThreadExecutor()
 
+  var esdTagString = ""
+
   // Date / Time variables.
   /** A static reference to the custom date format. */
   private val logDateFormat: SimpleDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ", Locale.US)
@@ -83,6 +85,7 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
   }
 
   fun stopThread(){
+    unregisterSensorListeners()
     this.interrupt()
   }
 
@@ -111,6 +114,7 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
         joSensorData.put("@timestamp", logDateFormat.format(Date(System.currentTimeMillis())))
         joSensorData.put("start_time", logDateFormat.format(Date(startTime)))
         joSensorData.put("log_duration_seconds", (System.currentTimeMillis() - startTime) / 1000)
+        joSensorData.put("tag", esdTagString )
         if (gpsRegistered && gpsLogger.gpsHasData) {
           joSensorData = gpsLogger.getGpsData(joSensorData)
           gpsReading = true

@@ -137,7 +137,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
       }while(!outCursor.isAfterLast)
       outCursor.close()
     }
-
+    //Log.e("dbHelper", "Data string = $bulkOutString")
     return bulkOutString
   }
 

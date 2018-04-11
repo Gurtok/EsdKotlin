@@ -24,11 +24,16 @@ import android.preference.PreferenceManager
 import android.util.Log
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.math.log
 
 class ServiceManager : Service() {
 
   /** Identify logcat messages. */
   private val logTag = "EsdServiceManager"
+
+  companion object {
+    val serviceManager = this
+  }
 
   /** Creates a new binder to this service. */
   private var serviceManagerBinder = ServiceBinder()
@@ -50,12 +55,16 @@ class ServiceManager : Service() {
   private var documentsIndexed = 0
   /** Number of data uploaded failures this session. */
   private var uploadErrors = 0
+
+
   /** True if we are currently reading sensor data. */
   private var logging = false
   /** Toggle, if we should be recording AUDIO sensor data. */
   private var audioLogging = false
   /** Toggle, if we should be recording GPS data. */
   private var gpsLogging = false
+
+
   /** Toggle, if this service is currently running. Used by the main activity. */
   private var serviceActive = false
   /** Time of the last sensor recording. Used to shut down unused resources. */
@@ -74,7 +83,7 @@ class ServiceManager : Service() {
   /** If we go more than an a half hour without recording any sensor data, shut down this thread. */
   private var serviceTimeoutRunnable = Runnable {
     // Last sensor result plus 1/2 hour in milliseconds is greater than the current time.
-    val timeCheck = lastSuccessfulSensorTime + (1000 * 60 * 30) > System.currentTimeMillis()
+    val timeCheck = lastSuccessfulSensorTime + (1000 * 60 * 30) < System.currentTimeMillis()
     if (!logging && !uploads.isWorking() && !timeCheck) {
       Log.e(logTag, "Shutting down service. Not logging!")
       stopServiceThread()
@@ -97,6 +106,7 @@ class ServiceManager : Service() {
 
   /** Return a reference to this instance of the service. */
   override fun onBind( intent: Intent): IBinder {
+    Log.e(logTag, "Activity requesting binder!!")
     return serviceManagerBinder
   }
 
@@ -118,7 +128,11 @@ class ServiceManager : Service() {
     if ( !serviceActive ) {
       dbHelper = DatabaseHelper( applicationContext  )
       val sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
-      sensorListener = SensorListener(baseContext, dbHelper, this)
+
+      sensorListener = SensorListener(applicationContext, dbHelper, this)
+      sensorListener.esdTagString = sharedPrefs.getString("tag","phone_index")
+
+
       uploads = UploadThread(sharedPrefs, this, dbHelper)
 
       lastSuccessfulSensorTime = System.currentTimeMillis()
@@ -131,10 +145,12 @@ class ServiceManager : Service() {
       timerPool.scheduleAtFixedRate(serviceTimeoutRunnable, 60, 60, TimeUnit.MINUTES)
       /* Send a message to the main thread to indicate the manager service has been initialized. */
       serviceActive = true
-      Log.i(logTag, "Started service manager.")
+      // Restart logging if the service was stopped by the OS.
+      restartLogging()
+      Log.i(logTag, "Started service manager." + this.applicationInfo)
     }
-    // If the service is shut down, do not restart it automatically.
-    return Service.START_NOT_STICKY
+    // If the service is shut down, restart it automatically.
+    return Service.START_STICKY
   }
 
   /** This method uses the passed UI handler to relay messages if/when the activity is running. */
@@ -214,6 +230,16 @@ class ServiceManager : Service() {
   fun startLogging() {
     logging = true
     if(serviceActive){
+      sensorListener.setSensorPower(true)
+      sensorListener.setGpsPower(gpsLogging)
+      sensorListener.setAudioPower(audioLogging)
+
+    }
+  }
+
+  private fun restartLogging(){
+    if(serviceActive && logging){
+      Log.i(logTag, "Restarting logging!!")
       sensorListener.setSensorPower(true)
       sensorListener.setGpsPower(gpsLogging)
       sensorListener.setAudioPower(audioLogging)
