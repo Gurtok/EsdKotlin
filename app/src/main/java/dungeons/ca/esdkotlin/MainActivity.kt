@@ -266,11 +266,6 @@ class MainActivity : Activity(){
     }
   }
 
-  /** If our activity is paused, we need to indicate to the service manager via a static variable. */
-  override fun onPause() {
-    super.onPause()
-  }
-
   /**
    * When the activity starts or resumes, we start the upload process immediately.
    */

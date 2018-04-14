@@ -36,7 +36,7 @@
 
         <TextView
             android:id="@+id/TickText"
-            style="@style/AppTheme"
+            style="@style/ESdTheme"
             android:layout_width="wrap_content"
             android:layout_height="30dp"
             android:layout_gravity="center"
@@ -133,7 +133,7 @@
                     android:paddingStart="5dp"
                     android:text="@string/Sensor_Readings"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="@android:color/black"
                     android:textSize="22sp" />
 
                 <TextView
@@ -144,7 +144,7 @@
                     android:gravity="center"
                     android:text="@string/_0"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="@android:color/black"
                     android:textDirection="ltr"
                     android:textSize="22sp" />
 
@@ -166,7 +166,7 @@
                     android:paddingStart="5dp"
                     android:text="@string/locationCount"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="@android:color/black"
                     android:textSize="22sp" />
 
                 <TextView
@@ -177,7 +177,7 @@
                     android:gravity="center"
                     android:text="@string/_0"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="?android:attr/colorForeground"
                     android:textDirection="ltr"
                     android:textSize="22sp" />
 
@@ -198,7 +198,7 @@
                     android:paddingStart="5dp"
                     android:text="@string/audio"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="@android:color/black"
                     android:textSize="22sp" />
 
                 <TextView
@@ -209,7 +209,7 @@
                     android:gravity="center"
                     android:text="@string/_0"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="@android:color/black"
                     android:textDirection="ltr"
                     android:textSize="22sp" />
 
@@ -230,7 +230,6 @@
                     android:paddingStart="5dp"
                     android:text="@string/databaseText"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
                     android:textSize="22sp" />
 
                 <TextView
@@ -241,7 +240,6 @@
                     android:gravity="center"
                     android:text="@string/_0"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
                     android:textDirection="ltr"
                     android:textSize="22sp" />
 
@@ -262,7 +260,6 @@
                     android:paddingStart="5dp"
                     android:text="@string/indexCountTv"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
                     android:textSize="22sp" />
 
                 <TextView
@@ -273,7 +270,7 @@
                     android:gravity="center"
                     android:text="@string/_0"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="@android:color/black"
                     android:textDirection="ltr"
                     android:textSize="22sp" />
 
@@ -294,7 +291,7 @@
                     android:paddingStart="5dp"
                     android:text="@string/Errors"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="@android:color/black"
                     android:textSize="22sp" />
 
                 <TextView
@@ -305,7 +302,7 @@
                     android:gravity="center"
                     android:text="@string/_0"
                     android:textAppearance="@style/TextAppearance.AppCompat"
-                    android:textColor="?attr/editTextColor"
+                    android:textColor="@android:color/black"
                     android:textDirection="ltr"
                     android:textSize="22sp" />
 

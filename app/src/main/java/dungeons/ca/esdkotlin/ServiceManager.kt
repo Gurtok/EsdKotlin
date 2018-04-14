@@ -24,16 +24,11 @@ import android.preference.PreferenceManager
 import android.util.Log
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.math.log
 
 class ServiceManager : Service() {
 
   /** Identify logcat messages. */
   private val logTag = "EsdServiceManager"
-
-  companion object {
-    val serviceManager = this
-  }
 
   /** Creates a new binder to this service. */
   private var serviceManagerBinder = ServiceBinder()
@@ -129,8 +124,7 @@ class ServiceManager : Service() {
       dbHelper = DatabaseHelper( applicationContext  )
       val sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
 
-      sensorListener = SensorListener(applicationContext, dbHelper, this)
-      sensorListener.esdTagString = sharedPrefs.getString("tag","phone_index")
+      sensorListener = SensorListener(applicationContext, dbHelper, this, sharedPrefs)
 
 
       uploads = UploadThread(sharedPrefs, this, dbHelper)

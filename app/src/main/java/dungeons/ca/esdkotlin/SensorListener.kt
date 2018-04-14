@@ -1,14 +1,12 @@
 package dungeons.ca.esdkotlin
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorManager
 import android.location.LocationManager
 import android.os.BatteryManager
+import android.preference.PreferenceManager
 import android.util.Log
 import org.json.JSONException
 import org.json.JSONObject
@@ -22,7 +20,7 @@ import java.util.concurrent.Executors
   */
 
 
-open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serviceManger: ServiceManager ): Thread(), android.hardware.SensorEventListener{
+open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serviceManger: ServiceManager, private val sharedPrefs: SharedPreferences ): Thread(), android.hardware.SensorEventListener{
 
   /** Use this to identify this classes log messages. */
   private val logTag = "SensorListener"
@@ -90,6 +88,7 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
   }
 
 
+
   /**
    * This is the main recording loop. One reading per sensorMessageHandler per loop.
    * Update timestamp in sensorMessageHandler data structure.
@@ -100,48 +99,49 @@ open class SensorListener(context: Context ,passedDbHelper: DatabaseHelper, serv
    * @param event A reference to the event object.
    */
   override fun onSensorChanged( event:SensorEvent ) {
-    if (!interrupted() && System.currentTimeMillis() > lastUpdate + sensorRefreshTime && sensorsRegistered) {
-      // ^^ Make sure we generate docs at an adjustable rate.
-      // 250ms is the default setting.
 
-      // Reset our flags to update the service manager about the type of sensor readings.
-      var gpsReading = false
-      var audioReading = false
+    // Reset our flags to update the service manager about the type of sensor readings.
+    var gpsReading = false
+    var audioReading = false
+    var sensorName: String
+    try {
+      joSensorData.put("@timestamp", logDateFormat.format(Date(System.currentTimeMillis())))
+      joSensorData.put("start_time", logDateFormat.format(Date(startTime)))
+      joSensorData.put("log_duration_seconds", (System.currentTimeMillis() - startTime) / 1000)
+      joSensorData.put("tag", sharedPrefs.getString("tag", "phone_index") )
 
-      var sensorName: String
-      var sensorHierarchyName: kotlin.collections.List<String>
-      try {
-        joSensorData.put("@timestamp", logDateFormat.format(Date(System.currentTimeMillis())))
-        joSensorData.put("start_time", logDateFormat.format(Date(startTime)))
-        joSensorData.put("log_duration_seconds", (System.currentTimeMillis() - startTime) / 1000)
-        joSensorData.put("tag", esdTagString )
-        if (gpsRegistered && gpsLogger.gpsHasData) {
-          joSensorData = gpsLogger.getGpsData(joSensorData)
-          gpsReading = true
-        }
-        if (audioRegistered && audioRunnable.hasData) {
-          joSensorData = audioRunnable.getAudioData(joSensorData)
-          audioReading = true
-        }
-        if (batteryLevel > 0) {
-          joSensorData.put("battery_percentage", batteryLevel)
-        }
-
-        for ( (index, cursor: Float) in event.values.withIndex() ) {
-          if (!cursor.isNaN() && cursor < Long.MAX_VALUE && cursor > Long.MIN_VALUE) {
-            sensorHierarchyName = event.sensor.stringType.split("\\.".toRegex())
-            sensorName = sensorHierarchyName[sensorHierarchyName.size - 1] + index
-            joSensorData.put(sensorName, cursor)
-          }
-        }
-
-        dbHelper.jsonToDatabase(joSensorData)
-        serviceManager.sensorSuccess(gpsReading, audioReading)
-        lastUpdate = System.currentTimeMillis()
-      } catch (JsonEx: JSONException ) {
-        Log.e(logTag, JsonEx.message + " || " + JsonEx.cause)
+      if (gpsRegistered && gpsLogger.gpsHasData) {
+        joSensorData = gpsLogger.getGpsData(joSensorData)
+        gpsReading = true
       }
+      if (audioRegistered && audioRunnable.hasData) {
+        joSensorData = audioRunnable.getAudioData(joSensorData)
+        audioReading = true
+      }
+      if (batteryLevel > 0) {
+        joSensorData.put("battery_percentage", batteryLevel)
+      }
+
+      for ( (index, cursor: Float) in event.values.withIndex() ) {
+        if (!cursor.isNaN() && cursor < Long.MAX_VALUE && cursor > Long.MIN_VALUE) {
+          val sensorHierarchyName: kotlin.collections.List<String> = event.sensor.stringType.split("\\.".toRegex())
+          sensorName = sensorHierarchyName[sensorHierarchyName.size - 1] + index
+          joSensorData.put(sensorName, cursor)
+        }
+      }
+
+    } catch (JsonEx: JSONException ) {
+      Log.e(logTag, JsonEx.message + " || " + JsonEx.cause)
     }
+
+    // Make sure we only generate docs at an adjustable rate
+    // We'll use 250ms for now
+    if (System.currentTimeMillis() > lastUpdate + sensorRefreshTime) {
+      dbHelper.jsonToDatabase(joSensorData)
+      serviceManager.sensorSuccess(gpsReading, audioReading)
+      lastUpdate = System.currentTimeMillis()
+    }
+
   }
 
 // Phone Sensors

@@ -17,9 +17,4 @@
     <string name="EsPasswordPreferences">Elastic password. </string>
     <string name="EsUsernamePreferences">Elastic user name. </string>
     <string name="Es_ssl_protection">Select for SSL connections.</string>
-    <string name="qrCodeTitle">QR Code</string>
-    <string name="qrCodeSummary">Import host address.</string>
-    <string name="ServiceManagerIntentAddressName"> dungeons.ca.esdKotlin.ServiceBroadcastReceiver </string>
-
-
 </resources>

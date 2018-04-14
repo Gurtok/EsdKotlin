@@ -12,7 +12,7 @@
         android:icon="@mipmap/ic_elastic_logo"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/ESdTheme">
         <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait">
@@ -33,18 +33,6 @@
             android:exported="false"
             android:label="ESD Service Manager">
         </service>
-
-        <receiver
-            android:name=".ServiceBroadcastReceiver"
-            android:enabled="true"
-            android:exported="true"
-            android:label="Restart service manager if stopped!"
-            android:permission="">
-            <intent-filter>
-                <action android:name = "dungeons.ca.esdKotlin.ServiceBroadcastReceiver"/>
-            </intent-filter>
-        </receiver>
-
 
     </application>
 
